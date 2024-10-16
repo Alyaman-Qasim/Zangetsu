@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Car Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameArea {
+            position: relative;
+            width: 400px;
+            height: 700px;
+            overflow: hidden;
+            border-radius: 15px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.8);
+            background-image: linear-gradient(to bottom, #000, #555);
+        }
+
+        /* Game Background */
+        #road {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #333;
+            animation: roadScroll 1.2s linear infinite;
+        }
+
+        @keyframes roadScroll {
+            0% {
+                background-position-y: 0;
+            }
+            100% {
+                background-position-y: 100%;
+            }
+        }
+
+        /* Car */
+        #car {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px; /* Increased width for more detail */
+            height: 120px; /* Increased height for more detail */
+            background-color: red; /* Base color */
+            border-radius: 10px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+            transition: left 0.1s ease-in-out;
+        }
+
+        /* GT-R Style */
+        #car::before {
+            content: '';
+            position: absolute;
+            top: -20px; /* Positioning for the roof */
+            left: 10%;
+            width: 80%; /* Roof width */
+            height: 30px; /* Roof height */
+            background-color: darkred; /* Roof color */
+            border-radius: 10px 10px 0 0; /* Round the top corners */
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Wheels */
+        .wheel {
+            position: absolute;
+            bottom: 5px;
+            width: 15px; /* Wheel size */
+            height: 15px;
+            background-color: black;
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .wheel.left {
+            left: 10%;
+        }
+
+        .wheel.right {
+            right: 10%;
+        }
+
+        /* Obstacles */
+        .obstacle {
+            position: absolute;
+            width: 50px;
+            height: 100px;
+            background-color: gray;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.7);
+        }
+
+        .obstacle-truck {
+            width: 70px;
+            height: 140px;
+            background-color: darkgray;
+            border-radius: 10px;
+        }
+
+        /* Score UI */
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 8px;
+        }
+
+        /* Power-up */
+        .power-up {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: gold;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.7);
+        }
+
+        /* Explosion Effect */
+        .explosion {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: orange;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(255, 69, 0, 0.7);
+            animation: explode 0.4s steps(5) forwards;
+        }
+
+        @keyframes explode {
+            from {
+                transform: scale(1);
+            }
+            to {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="road"></div>
+        <div id="car">
+            <div class="wheel left"></div>
+            <div class="wheel right"></div>
+        </div>
+        <div id="score">Score: 0</div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('gameArea');
+        const car = document.getElementById('car');
+        const scoreDisplay = document.getElementById('score');
+        let score = 0;
+        let gameOver = false;
+        let carPosition = gameArea.offsetWidth / 2 - car.offsetWidth / 2;
+        let invincible = false;
+
+        // Car control using A and D keys
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'a' || event.key === 'A') { // Move left
+                if (carPosition > 0) {
+                    carPosition -= 30;
+                }
+            } else if (event.key === 'd' || event.key === 'D') { // Move right
+                if (carPosition < gameArea.offsetWidth - car.offsetWidth) {
+                    carPosition += 30;
+                }
+            }
+            car.style.left = `${carPosition}px`;
+        });
+
+        // Create obstacles
+        function createObstacle() {
+            const obstacle = document.createElement('div');
+            const isTruck = Math.random() > 0.7;  // 30% chance it's a truck
+            obstacle.classList.add(isTruck ? 'obstacle-truck' : 'obstacle');
+            obstacle.style.left = `${Math.random() * (gameArea.offsetWidth - obstacle.offsetWidth)}px`;
+            gameArea.appendChild(obstacle);
+
+            let obstaclePosition = -100;
+            const obstacleInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(obstacleInterval);
+                    return;
+                }
+
+                obstaclePosition += 8 + score * 0.1;
+                obstacle.style.top = `${obstaclePosition}px`;
+
+                if (obstaclePosition > gameArea.offsetHeight) {
+                    clearInterval(obstacleInterval);
+                    gameArea.removeChild(obstacle);
+                    score++;
+                    scoreDisplay.innerText = `Score: ${score}`;
+                }
+
+                if (isCollision(obstacle)) {
+                    if (!invincible) {
+                        gameOver = true;
+                        explode(obstacle);
+                    }
+                }
+            }, 20);
+        }
+
+        // Collision detection
+        function isCollision(obstacle) {
+            const carRect = car.getBoundingClientRect();
+            const obstacleRect = obstacle.getBoundingClientRect();
+            return !(
+                carRect.top > obstacleRect.bottom ||
+                carRect.bottom < obstacleRect.top ||
+                carRect.left > obstacleRect.right ||
+                carRect.right < obstacleRect.left
+            );
+        }
+
+        // Power-up
+        function createPowerUp() {
+            const powerUp = document.createElement('div');
+            powerUp.classList.add('power-up');
+            powerUp.style.left = `${Math.random() * (gameArea.offsetWidth - 40)}px`;
+            gameArea.appendChild(powerUp);
+
+            let powerUpPosition = -40;
+            const powerUpInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(powerUpInterval);
+                    return;
+                }
+
+                powerUpPosition += 8;
+                powerUp.style.top = `${powerUpPosition}px`;
+
+                if (powerUpPosition > gameArea.offsetHeight) {
+                    clearInterval(powerUpInterval);
+                    gameArea.removeChild(powerUp);
+                }
+
+                if (isCollision(powerUp)) {
+                    activatePowerUp();
+                    gameArea.removeChild(powerUp);
+                    clearInterval(powerUpInterval);
+                }
+            }, 20);
+        }
+
+        // Explosion animation
+        function explode(obstacle) {
+            const explosion = document.createElement('div');
+            explosion.classList.add('explosion');
+            explosion.style.left = `${parseInt(obstacle.style.left)}px`;
+            explosion.style.top = `${parseInt(obstacle.style.top)}px`;
+            gameArea.appendChild(explosion);
+
+            setTimeout(() => {
+                alert(`BOOM! You crashed. Final Score: ${score}`);
+                location.reload();
+            }, 600);
+        }
+
+        // Power-up activation
+        function activatePowerUp() {
+            invincible = true;
+            car.style.filter = 'brightness(1.5)';
+            setTimeout(() => {
+                invincible = false;
+                car.style.filter = 'none';
+            }, 5000);
+        }
+
+        // Main game loops
+        setInterval(createObstacle, 800);
+        setInterval(createPowerUp, 15000);
+    </script>
+</body>
+</html>
